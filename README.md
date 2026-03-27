@@ -1,6 +1,6 @@
 # figma-mcp-go
 
-> A **zero-cost, unlimited** Figma MCP server — no API key, no rate limits, just a single Go binary.
+> Figma MCP server for Free Users, No Rate Limits
 
 Works with Cursor, Claude, GitHub Copilot, and any MCP-compatible AI tool.
 
