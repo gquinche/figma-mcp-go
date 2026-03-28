@@ -6,12 +6,14 @@
   "bin": {
     "figma-mcp-go": "bin/run.js"
   },
-  "scripts": {
-    "postinstall": "node scripts/install.js"
-  },
   "files": [
     "bin/run.js",
-    "scripts"
+    "bin/darwin-amd64/",
+    "bin/darwin-arm64/",
+    "bin/linux-amd64/",
+    "bin/linux-arm64/",
+    "bin/windows-amd64/",
+    "bin/windows-arm64/"
   ],
   "keywords": [
     "figma",

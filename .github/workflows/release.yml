@@ -26,29 +26,30 @@ jobs:
         env:
           VERSION: ${{ steps.version.outputs.value }}
         run: |
-          mkdir -p dist
           for GOOS in darwin linux windows; do
             for GOARCH in amd64 arm64; do
               BIN="figma-mcp-go"
               if [ "$GOOS" = "windows" ]; then BIN="figma-mcp-go.exe"; fi
 
+              OUTDIR="npm/bin/${GOOS}-${GOARCH}"
+              mkdir -p "$OUTDIR"
+
               GOOS=$GOOS GOARCH=$GOARCH go build \
                 -ldflags "-X main.version=$VERSION" \
-                -o "dist/$BIN" \
+                -o "$OUTDIR/$BIN" \
                 ./cmd/figma-mcp-go
 
-              if [ "$GOOS" = "windows" ]; then
-                (cd dist && zip "figma-mcp-go_${GOOS}_${GOARCH}.zip" "$BIN" && rm "$BIN")
-              else
-                (cd dist && tar czf "figma-mcp-go_${GOOS}_${GOARCH}.tar.gz" "$BIN" && rm "$BIN")
-              fi
+              if [ "$GOOS" != "windows" ]; then chmod +x "$OUTDIR/$BIN"; fi
             done
           done
+
+      - name: Package plugin
+        run: zip -r plugin.zip plugin/
 
       - name: Create GitHub release
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/*
+          files: plugin.zip
           generate_release_notes: true
 
       - uses: actions/setup-node@v4
@@ -62,5 +63,6 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           VERSION: ${{ steps.version.outputs.value }}
         run: |
+          cp ../README.md .
           npm version "$VERSION" --no-git-tag-version --allow-same-version
           npm publish --access public
