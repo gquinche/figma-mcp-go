@@ -22,6 +22,7 @@ var bridgeLogger = log.New(os.Stderr, "[bridge] ", 0)
 type pendingEntry struct {
 	ch    chan BridgeResponse
 	timer *time.Timer
+	once  sync.Once // guards channel close/send — prevents panic on concurrent timeout + response
 }
 
 // Bridge manages the single WebSocket connection from the Figma plugin
@@ -101,6 +102,8 @@ func (b *Bridge) readLoop(conn *websocket.Conn) {
 			entry, ok := b.pending[resp.RequestID]
 			b.mu.RUnlock()
 			if ok {
+				// Stop before Reset to avoid the AfterFunc firing during Reset.
+				entry.timer.Stop()
 				entry.timer.Reset(60 * time.Second)
 				bridgeLogger.Printf("progress %s: %d%% %s", resp.RequestID, resp.Progress, resp.Message)
 			} else {
@@ -128,7 +131,8 @@ func (b *Bridge) readLoop(conn *websocket.Conn) {
 				bridgeLogger.Printf("← %s ok", resp.RequestID)
 			}
 			entry.timer.Stop()
-			entry.ch <- resp
+			// Use once to prevent sending on a channel already closed by timeout.
+			entry.once.Do(func() { entry.ch <- resp })
 		} else {
 			bridgeLogger.Printf("← %s received but no pending entry (timed out?)", resp.RequestID)
 		}
@@ -163,7 +167,8 @@ func (b *Bridge) Send(ctx context.Context, requestType string, nodeIDs []string,
 		b.mu.Lock()
 		delete(b.pending, requestID)
 		b.mu.Unlock()
-		close(ch)
+		// Use once to prevent closing a channel already consumed by the read goroutine.
+		entry.once.Do(func() { close(ch) })
 	})
 
 	b.mu.Lock()
