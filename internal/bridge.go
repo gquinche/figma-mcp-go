@@ -29,6 +29,7 @@ type pendingEntry struct {
 // and matches responses to pending requests via request IDs.
 type Bridge struct {
 	mu      sync.RWMutex
+	wmu     sync.Mutex // serialises concurrent WebSocket writes (coder/websocket does not support concurrent writes)
 	conn    *websocket.Conn
 	pending map[string]*pendingEntry
 	counter atomic.Int64
@@ -183,13 +184,16 @@ func (b *Bridge) Send(ctx context.Context, requestType string, nodeIDs []string,
 	bridgeLogger.Printf("→ %s %s nodeIDs=%v params=%v", requestID, requestType, nodeIDs, params)
 	start := time.Now()
 
-	if err := wsjson.Write(ctx, conn, req); err != nil {
+	b.wmu.Lock()
+	writeErr := wsjson.Write(ctx, conn, req)
+	b.wmu.Unlock()
+	if writeErr != nil {
 		entry.timer.Stop()
 		b.mu.Lock()
 		delete(b.pending, requestID)
 		b.mu.Unlock()
-		bridgeLogger.Printf("→ %s %s write error: %v", requestID, requestType, err)
-		return BridgeResponse{}, fmt.Errorf("send: %w", err)
+		bridgeLogger.Printf("→ %s %s write error: %v", requestID, requestType, writeErr)
+		return BridgeResponse{}, fmt.Errorf("send: %w", writeErr)
 	}
 
 	select {
