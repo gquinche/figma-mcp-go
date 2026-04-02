@@ -537,6 +537,118 @@ export const handleWriteRequest = async (request: any) => {
       };
     }
 
+    case "apply_style_to_node": {
+      const p = request.params || {};
+      const nodeId = request.nodeIds && request.nodeIds[0];
+      if (!nodeId) throw new Error("nodeId is required");
+      if (!p.styleId) throw new Error("styleId is required");
+      const node = await figma.getNodeByIdAsync(nodeId);
+      if (!node) throw new Error(`Node not found: ${nodeId}`);
+      const style = await figma.getStyleByIdAsync(p.styleId);
+      if (!style) throw new Error(`Style not found: ${p.styleId}`);
+      const n = node as any;
+      switch (style.type) {
+        case "PAINT": {
+          const target = p.target || "fill";
+          if (target === "stroke") {
+            if (!("strokeStyleId" in node)) throw new Error(`Node ${nodeId} does not support stroke styles`);
+            n.strokeStyleId = p.styleId;
+          } else {
+            if (!("fillStyleId" in node)) throw new Error(`Node ${nodeId} does not support fill styles`);
+            n.fillStyleId = p.styleId;
+          }
+          break;
+        }
+        case "TEXT":
+          if (!("textStyleId" in node)) throw new Error(`Node ${nodeId} does not support text styles`);
+          n.textStyleId = p.styleId;
+          break;
+        case "EFFECT":
+          if (!("effectStyleId" in node)) throw new Error(`Node ${nodeId} does not support effect styles`);
+          n.effectStyleId = p.styleId;
+          break;
+        case "GRID":
+          if (!("gridStyleId" in node)) throw new Error(`Node ${nodeId} does not support grid styles`);
+          n.gridStyleId = p.styleId;
+          break;
+        default:
+          throw new Error(`Unknown style type: ${(style as any).type}`);
+      }
+      figma.commitUndo();
+      return {
+        type: request.type,
+        requestId: request.requestId,
+        data: { id: n.id, name: n.name, styleId: p.styleId, styleType: style.type },
+      };
+    }
+
+    case "bind_variable_to_node": {
+      const p = request.params || {};
+      const nodeId = request.nodeIds && request.nodeIds[0];
+      if (!nodeId) throw new Error("nodeId is required");
+      if (!p.variableId) throw new Error("variableId is required");
+      if (!p.field) throw new Error("field is required");
+      const node = await figma.getNodeByIdAsync(nodeId) as any;
+      if (!node) throw new Error(`Node not found: ${nodeId}`);
+      const variable = await figma.variables.getVariableByIdAsync(p.variableId);
+      if (!variable) throw new Error(`Variable not found: ${p.variableId}`);
+      if (p.field === "fillColor") {
+        if (!("fills" in node)) throw new Error(`Node ${nodeId} does not support fills`);
+        const fills = [...(node.fills as Paint[])];
+        const base = fills.length > 0 ? fills[0] : makeSolidPaint("#000000");
+        const paint = figma.variables.setBoundVariableForPaint(base as SolidPaint, "color", variable);
+        node.fills = [paint];
+      } else {
+        if (!(p.field in node)) throw new Error(`Node ${nodeId} does not have field: ${p.field}`);
+        node.setBoundVariable(p.field, variable);
+      }
+      figma.commitUndo();
+      return {
+        type: request.type,
+        requestId: request.requestId,
+        data: { id: node.id, name: node.name, variableId: p.variableId, field: p.field },
+      };
+    }
+
+    case "swap_component": {
+      const p = request.params || {};
+      const nodeId = request.nodeIds && request.nodeIds[0];
+      if (!nodeId) throw new Error("nodeId is required");
+      if (!p.componentId) throw new Error("componentId is required");
+      const node = await figma.getNodeByIdAsync(nodeId);
+      if (!node) throw new Error(`Node not found: ${nodeId}`);
+      if (node.type !== "INSTANCE") throw new Error(`Node ${nodeId} is not a component INSTANCE`);
+      const component = await figma.getNodeByIdAsync(p.componentId);
+      if (!component) throw new Error(`Component not found: ${p.componentId}`);
+      if (component.type !== "COMPONENT") throw new Error(`Node ${p.componentId} is not a COMPONENT`);
+      node.mainComponent = component;
+      figma.commitUndo();
+      return {
+        type: request.type,
+        requestId: request.requestId,
+        data: { id: node.id, name: node.name, componentId: component.id, componentName: component.name },
+      };
+    }
+
+    case "detach_instance": {
+      const nodeIds = request.nodeIds || [];
+      if (nodeIds.length === 0) throw new Error("nodeIds is required");
+      const results: any[] = [];
+      for (const nid of nodeIds) {
+        const n = await figma.getNodeByIdAsync(nid);
+        if (!n) { results.push({ nodeId: nid, error: "Node not found" }); continue; }
+        if (n.type !== "INSTANCE") { results.push({ nodeId: nid, error: "Node is not an INSTANCE" }); continue; }
+        const frame = n.detachInstance();
+        results.push({ nodeId: nid, newId: frame.id, name: frame.name });
+      }
+      figma.commitUndo();
+      return {
+        type: request.type,
+        requestId: request.requestId,
+        data: { results },
+      };
+    }
+
     default:
       return null;
   }

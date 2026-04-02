@@ -506,6 +506,99 @@ func registerWriteTools(s *server.MCPServer, node *Node) {
 		return renderResponse(resp, err)
 	})
 
+	// ── Write — Linked styles & variables ───────────────────────────────
+
+	s.AddTool(mcp.NewTool("apply_style_to_node",
+		mcp.WithDescription("Apply an existing local style (paint, text, effect, or grid) to a node, linking the node to that style."),
+		mcp.WithString("nodeId",
+			mcp.Required(),
+			mcp.Description("Target node ID in colon format e.g. 4029:12345"),
+		),
+		mcp.WithString("styleId",
+			mcp.Required(),
+			mcp.Description("Style ID to apply (from get_styles)"),
+		),
+		mcp.WithString("target", mcp.Description("For paint styles only — apply to 'fill' (default) or 'stroke'")),
+	), func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		args := req.GetArguments()
+		nodeID, _ := args["nodeId"].(string)
+		nodeID = NormalizeNodeID(nodeID)
+		params := map[string]interface{}{
+			"styleId": args["styleId"],
+		}
+		if t, ok := args["target"]; ok {
+			params["target"] = t
+		}
+		resp, err := node.Send(ctx, "apply_style_to_node", []string{nodeID}, params)
+		return renderResponse(resp, err)
+	})
+
+	s.AddTool(mcp.NewTool("bind_variable_to_node",
+		mcp.WithDescription("Bind a local variable to a node property, so the property is driven by the variable's value. Use 'fillColor' to bind a COLOR variable to the node's fill color. Use other fields (opacity, width, height, cornerRadius, itemSpacing, paddingTop, paddingRight, paddingBottom, paddingLeft) for FLOAT variables."),
+		mcp.WithString("nodeId",
+			mcp.Required(),
+			mcp.Description("Target node ID in colon format e.g. 4029:12345"),
+		),
+		mcp.WithString("variableId",
+			mcp.Required(),
+			mcp.Description("Variable ID to bind (from get_variable_defs)"),
+		),
+		mcp.WithString("field",
+			mcp.Required(),
+			mcp.Description("Property to bind: fillColor | opacity | width | height | cornerRadius | itemSpacing | paddingTop | paddingRight | paddingBottom | paddingLeft"),
+		),
+	), func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		args := req.GetArguments()
+		nodeID, _ := args["nodeId"].(string)
+		nodeID = NormalizeNodeID(nodeID)
+		params := map[string]interface{}{
+			"variableId": args["variableId"],
+			"field":      args["field"],
+		}
+		resp, err := node.Send(ctx, "bind_variable_to_node", []string{nodeID}, params)
+		return renderResponse(resp, err)
+	})
+
+	// ── Write — Components ───────────────────────────────────────────────
+
+	s.AddTool(mcp.NewTool("swap_component",
+		mcp.WithDescription("Swap the main component of an existing INSTANCE node, replacing it with a different component while keeping position and size."),
+		mcp.WithString("nodeId",
+			mcp.Required(),
+			mcp.Description("INSTANCE node ID in colon format e.g. 4029:12345"),
+		),
+		mcp.WithString("componentId",
+			mcp.Required(),
+			mcp.Description("Target COMPONENT node ID in colon format (from get_local_components)"),
+		),
+	), func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		args := req.GetArguments()
+		nodeID, _ := args["nodeId"].(string)
+		nodeID = NormalizeNodeID(nodeID)
+		componentID, _ := args["componentId"].(string)
+		componentID = NormalizeNodeID(componentID)
+		params := map[string]interface{}{"componentId": componentID}
+		resp, err := node.Send(ctx, "swap_component", []string{nodeID}, params)
+		return renderResponse(resp, err)
+	})
+
+	s.AddTool(mcp.NewTool("detach_instance",
+		mcp.WithDescription("Detach one or more component instances, converting them to plain frames. The link to the main component is broken; all visual properties are preserved."),
+		mcp.WithArray("nodeIds",
+			mcp.Required(),
+			mcp.Description("INSTANCE node IDs in colon format e.g. ['4029:12345']"),
+			mcp.WithStringItems(),
+		),
+	), func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		raw, _ := req.GetArguments()["nodeIds"].([]interface{})
+		nodeIDs := toStringSlice(raw)
+		for i, id := range nodeIDs {
+			nodeIDs[i] = NormalizeNodeID(id)
+		}
+		resp, err := node.Send(ctx, "detach_instance", nodeIDs, nil)
+		return renderResponse(resp, err)
+	})
+
 	// ── Write — Delete ───────────────────────────────────────────────────
 
 	s.AddTool(mcp.NewTool("delete_nodes",

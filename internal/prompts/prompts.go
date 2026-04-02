@@ -10,4 +10,10 @@ func RegisterAll(s *server.MCPServer) {
 	addAnnotationConversionStrategy(s)
 	addSwapOverridesInstances(s)
 	addReactionToConnectorStrategy(s)
+	addStyleAuditStrategy(s)
+	addBulkRenameStrategy(s)
+	addDesignTokenGenerationStrategy(s)
+	addGenerateColorPalette(s)
+	addGenerateTypeScale(s)
+	addGenerateComponentVariants(s)
 }
