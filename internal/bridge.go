@@ -220,7 +220,7 @@ func (b *Bridge) Close() {
 
 	for id, entry := range b.pending {
 		entry.timer.Stop()
-		close(entry.ch)
+		entry.once.Do(func() { close(entry.ch) })
 		delete(b.pending, id)
 	}
 

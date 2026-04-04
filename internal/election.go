@@ -14,14 +14,19 @@ var electionLogger = log.New(os.Stderr, "[election] ", 0)
 // Election determines the initial role and monitors leader health.
 // If the leader dies, a follower will attempt a takeover.
 type Election struct {
-	port   int
-	node   *Node
-	cancel context.CancelFunc
+	port     int
+	node     *Node
+	follower *Follower // reused across health-check ticks to avoid HTTP client pool leaks
+	cancel   context.CancelFunc
 }
 
 // NewElection creates an Election for the given port and node.
 func NewElection(port int, node *Node) *Election {
-	return &Election{port: port, node: node}
+	return &Election{
+		port:     port,
+		node:     node,
+		follower: NewFollower("http://localhost:" + itoa(port)),
+	}
 }
 
 // Start determines the initial role and launches the background monitor.
@@ -51,8 +56,7 @@ func (e *Election) determineRole(ctx context.Context) error {
 	}
 
 	// Port taken — check if there is a healthy leader
-	follower := NewFollower("http://localhost:" + itoa(e.port))
-	if follower.Ping(ctx) {
+	if e.follower.Ping(ctx) {
 		e.node.BecomeFollower()
 		return nil
 	}
@@ -84,8 +88,7 @@ func (e *Election) monitor(ctx context.Context) {
 func (e *Election) tick(ctx context.Context) error {
 	switch e.node.Role() {
 	case RoleFollower:
-		follower := NewFollower("http://localhost:" + itoa(e.port))
-		if !follower.Ping(ctx) {
+		if !e.follower.Ping(ctx) {
 			electionLogger.Printf("leader not responding, attempting takeover...")
 			if err := e.node.BecomeLeader(); err != nil {
 				electionLogger.Printf("takeover failed: %v", err)

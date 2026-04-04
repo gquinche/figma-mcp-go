@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strconv"
+	"sync"
 	"testing"
 	"time"
 )
@@ -38,7 +39,7 @@ func TestItoa(t *testing.T) {
 
 func TestElectionTick_LeaderDoesNothing(t *testing.T) {
 	port := freePort(t)
-	n := NewNode(port)
+	n := NewNode(port, "test")
 
 	if err := n.BecomeLeader(); err != nil {
 		t.Fatalf("BecomeLeader: %v", err)
@@ -71,7 +72,7 @@ func TestElectionTick_FollowerHealthyLeader(t *testing.T) {
 	}
 	testPort := tcpAddr.Port
 
-	n := NewNode(testPort)
+	n := NewNode(testPort, "test")
 	n.BecomeFollower()
 
 	e := NewElection(testPort, n)
@@ -89,7 +90,7 @@ func TestElectionTick_FollowerHealthyLeader(t *testing.T) {
 func TestElectionTick_FollowerDeadLeader_TakesOver(t *testing.T) {
 	port := freePort(t)
 
-	n := NewNode(port)
+	n := NewNode(port, "test")
 	n.BecomeFollower()
 	t.Cleanup(n.Stop)
 
@@ -108,7 +109,7 @@ func TestElectionTick_FollowerDeadLeader_TakesOver(t *testing.T) {
 
 func TestElectionTick_UnknownBecomesLeader(t *testing.T) {
 	port := freePort(t)
-	n := NewNode(port)
+	n := NewNode(port, "test")
 	// Role stays UNKNOWN — no BecomeLeader/BecomeFollower called.
 	t.Cleanup(n.Stop)
 
@@ -126,7 +127,7 @@ func TestElectionTick_UnknownBecomesLeader(t *testing.T) {
 
 func TestElectionStart_Stop(t *testing.T) {
 	port := freePort(t)
-	n := NewNode(port)
+	n := NewNode(port, "test")
 	t.Cleanup(n.Stop)
 
 	e := NewElection(port, n)
@@ -143,4 +144,95 @@ func TestElectionStart_Stop(t *testing.T) {
 	}
 
 	e.Stop() // must not panic
+}
+
+// ── Concurrent: two nodes race to become leader ───────────────────────────────
+
+// TestElection_ConcurrentStart_OneLeader starts two elections on the same port
+// simultaneously and asserts that exactly one node becomes leader and the other
+// settles as follower.
+func TestElection_ConcurrentStart_OneLeader(t *testing.T) {
+	port := freePort(t)
+
+	n1 := NewNode(port, "test")
+	n2 := NewNode(port, "test")
+	t.Cleanup(n1.Stop)
+	t.Cleanup(n2.Stop)
+
+	e1 := NewElection(port, n1)
+	e2 := NewElection(port, n2)
+	t.Cleanup(e1.Stop)
+	t.Cleanup(e2.Stop)
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() { defer wg.Done(); e1.Start(context.Background()) }() //nolint:errcheck
+	go func() { defer wg.Done(); e2.Start(context.Background()) }() //nolint:errcheck
+	wg.Wait()
+
+	// Allow monitor ticks to resolve any RoleUnknown node.
+	time.Sleep(200 * time.Millisecond)
+
+	leaders, followers := 0, 0
+	for _, n := range []*Node{n1, n2} {
+		switch n.Role() {
+		case RoleLeader:
+			leaders++
+		case RoleFollower:
+			followers++
+		}
+	}
+	if leaders != 1 {
+		t.Errorf("expected 1 leader, got %d (n1=%s n2=%s)", leaders, n1.RoleName(), n2.RoleName())
+	}
+	if followers != 1 {
+		t.Errorf("expected 1 follower, got %d (n1=%s n2=%s)", followers, n1.RoleName(), n2.RoleName())
+	}
+}
+
+// ── Concurrent: multiple followers race for takeover ─────────────────────────
+
+// TestElection_ConcurrentTakeover_OneLeader verifies that when a leader dies and
+// several followers call tick() simultaneously, exactly one wins the port.
+func TestElection_ConcurrentTakeover_OneLeader(t *testing.T) {
+	port := freePort(t)
+
+	// Elect a real leader so followers can ping it.
+	leader := NewNode(port, "test")
+	if err := leader.BecomeLeader(); err != nil {
+		t.Fatalf("BecomeLeader: %v", err)
+	}
+
+	const n = 3
+	nodes := make([]*Node, n)
+	elections := make([]*Election, n)
+	for i := range nodes {
+		nodes[i] = NewNode(port, "test")
+		nodes[i].BecomeFollower()
+		elections[i] = NewElection(port, nodes[i])
+		t.Cleanup(nodes[i].Stop)
+	}
+
+	// Kill the leader — port is now free for takeover.
+	leader.Stop()
+
+	// All followers attempt takeover at the same time.
+	var wg sync.WaitGroup
+	ctx := context.Background()
+	for _, e := range elections {
+		wg.Add(1)
+		e := e
+		go func() { defer wg.Done(); e.tick(ctx) }() //nolint:errcheck
+	}
+	wg.Wait()
+
+	newLeaders := 0
+	for _, node := range nodes {
+		if node.Role() == RoleLeader {
+			newLeaders++
+		}
+	}
+	if newLeaders != 1 {
+		t.Errorf("expected exactly 1 new leader, got %d", newLeaders)
+	}
 }

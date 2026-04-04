@@ -22,10 +22,11 @@ type Node struct {
 }
 
 // NewNode creates a Node in the Unknown role.
-func NewNode(port int) *Node {
+func NewNode(port int, version string) *Node {
 	return &Node{
 		port:     port,
 		role:     RoleUnknown,
+		version:  version,
 		follower: NewFollower(fmt.Sprintf("http://localhost:%d", port)),
 	}
 }

@@ -24,7 +24,7 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	node := internal.NewNode(port)
+	node := internal.NewNode(port, version)
 	election := internal.NewElection(port, node)
 
 	if err := election.Start(ctx); err != nil {
