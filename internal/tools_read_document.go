@@ -59,7 +59,7 @@ func registerReadDocumentTools(s *server.MCPServer, node *Node) {
 			mcp.Description("Property verbosity: minimal (id/name/type/bounds only), compact (+fills/strokes/opacity), full (everything, default)"),
 		),
 		mcp.WithBoolean("dedupe_components",
-			mcp.Description("When true, INSTANCE nodes are serialized compactly (mainComponentId + componentProperties overrides only) and unique component definitions are collected once in a top-level componentDefs map. Highly token-efficient for screens with many repeated component instances."),
+			mcp.Description("When true, INSTANCE nodes are serialized compactly (mainComponentId + componentProperties + overrides array of differing text/nested content) and unique component definitions are collected once in a top-level componentDefs map. Highly token-efficient for screens with many repeated component instances."),
 		),
 	), func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		params := map[string]interface{}{}

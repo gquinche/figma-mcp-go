@@ -70,9 +70,47 @@ export const handleReadDocumentRequest = async (request: any) => {
         return await serializeNode(n);
       };
 
+      const extractInstanceOverrides = async (
+        instanceNode: any,
+        componentNode: any,
+      ): Promise<{ id: string; name: string; type: string; characters?: string; mainComponentId?: string | null }[]> => {
+        const overrides: any[] = [];
+        if (!instanceNode?.children || !componentNode?.children) return overrides;
+        for (let i = 0; i < instanceNode.children.length; i++) {
+          const instChild = instanceNode.children[i];
+          const compChild = componentNode.children[i];
+          if (!instChild || !compChild) continue;
+
+          if (instChild.type === "TEXT") {
+            if (instChild.characters !== compChild.characters) {
+              overrides.push({ id: instChild.id, name: instChild.name, type: "TEXT", characters: instChild.characters });
+            }
+            continue;
+          }
+
+          if (instChild.type === "INSTANCE") {
+            const [nestedMc, compMc] = await Promise.all([
+              instChild.getMainComponentAsync(),
+              compChild.type === "INSTANCE" ? compChild.getMainComponentAsync() : Promise.resolve(null),
+            ]);
+            if (nestedMc?.id !== compMc?.id) {
+              overrides.push({ id: instChild.id, name: instChild.name, type: "INSTANCE", mainComponentId: nestedMc?.id ?? null });
+              continue;
+            }
+            if (nestedMc) overrides.push(...await extractInstanceOverrides(instChild, nestedMc));
+            continue;
+          }
+
+          if ("children" in instChild) {
+            overrides.push(...await extractInstanceOverrides(instChild, compChild));
+          }
+        }
+        return overrides;
+      };
+
       const serializeWithDepth = async (node: any, currentDepth: number): Promise<any> => {
         if (dedupeComponents && node.type === "INSTANCE") {
-          const mc = node.mainComponent;
+          const mc = await node.getMainComponentAsync();
           if (mc && !componentDefs.has(mc.id)) {
             componentDefs.set(mc.id, await serializeNode(mc));
           }
@@ -90,6 +128,8 @@ export const handleReadDocumentRequest = async (request: any) => {
             mainComponentId: mc?.id ?? null,
           };
           if (Object.keys(props).length > 0) result.componentProperties = props;
+          const overrides = await extractInstanceOverrides(node, mc);
+          if (overrides.length > 0) result.overrides = overrides;
           return result;
         }
         if (detail === "full") {
