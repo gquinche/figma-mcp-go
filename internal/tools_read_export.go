@@ -1,16 +1,20 @@
 package internal
 
 import (
+	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
+	"github.com/pdfcpu/pdfcpu/pkg/api"
 )
 
 func registerReadExportTools(s *server.MCPServer, node *Node) {
@@ -109,38 +113,80 @@ func executeExportFramesToPDF(ctx context.Context, node *Node, nodeIDs []string,
 		return mcp.NewToolResultError(resp.Error), nil
 	}
 
-	b64, err := extractPDFBase64(resp.Data)
+	pages, err := extractFramePDFs(resp.Data)
 	if err != nil {
 		return mcp.NewToolResultError(err.Error()), nil
 	}
 
-	bytesWritten, err := writeBase64(b64, resolvedPath)
+	merged, err := mergePDFPages(pages)
 	if err != nil {
-		return mcp.NewToolResultError(err.Error()), nil
+		return mcp.NewToolResultError(fmt.Sprintf("merge PDFs: %v", err)), nil
+	}
+
+	if err := os.MkdirAll(filepath.Dir(resolvedPath), 0o755); err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("mkdir: %v", err)), nil
+	}
+	if _, statErr := os.Stat(resolvedPath); statErr == nil {
+		return mcp.NewToolResultError(fmt.Sprintf("file already exists: %s", resolvedPath)), nil
+	}
+	if err := os.WriteFile(resolvedPath, merged, 0o644); err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("write file: %v", err)), nil
 	}
 
 	out, _ := json.Marshal(map[string]interface{}{
 		"outputPath":   resolvedPath,
-		"bytesWritten": bytesWritten,
-		"pageCount":    len(nodeIDs),
+		"bytesWritten": len(merged),
+		"pageCount":    len(pages),
 		"success":      true,
 	})
 	return mcp.NewToolResultText(string(out)), nil
 }
 
-func extractPDFBase64(data interface{}) (string, error) {
+// extractFramePDFs parses the plugin response `{frames:[{base64:...},...]}` and
+// returns raw PDF bytes for each frame.
+func extractFramePDFs(data interface{}) ([][]byte, error) {
 	b, err := json.Marshal(data)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	var wrapper struct {
-		Base64 string `json:"base64"`
+		Frames []struct {
+			Base64 string `json:"base64"`
+		} `json:"frames"`
 	}
 	if err := json.Unmarshal(b, &wrapper); err != nil {
-		return "", err
+		return nil, err
 	}
-	if wrapper.Base64 == "" {
-		return "", errors.New("no PDF data returned by plugin")
+	if len(wrapper.Frames) == 0 {
+		return nil, errors.New("no PDF frames returned by plugin")
 	}
-	return wrapper.Base64, nil
+	pages := make([][]byte, 0, len(wrapper.Frames))
+	for i, f := range wrapper.Frames {
+		if f.Base64 == "" {
+			return nil, fmt.Errorf("frame %d has empty base64", i)
+		}
+		raw, err := base64.StdEncoding.DecodeString(f.Base64)
+		if err != nil {
+			return nil, fmt.Errorf("frame %d: base64 decode: %w", i, err)
+		}
+		pages = append(pages, raw)
+	}
+	return pages, nil
+}
+
+// mergePDFPages merges one or more single-page PDFs into one multi-page PDF
+// using pdfcpu. Each element of pages must be a valid PDF byte slice.
+func mergePDFPages(pages [][]byte) ([]byte, error) {
+	if len(pages) == 0 {
+		return nil, errors.New("no pages to merge")
+	}
+	readers := make([]io.ReadSeeker, len(pages))
+	for i, p := range pages {
+		readers[i] = bytes.NewReader(p)
+	}
+	var buf bytes.Buffer
+	if err := api.MergeRaw(readers, &buf, false, nil); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
 }
