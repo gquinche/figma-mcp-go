@@ -17,6 +17,12 @@ Open-source Figma MCP server with full read/write access via plugin — no REST 
 - Full design automation — styles, variables, components, prototypes, and content
 - Design strategies included — read_design_strategy, design_strategy, and more prompts built in
 
+**Styles, Variables, Components, Prototypes, and Content**
+
+https://github.com/user-attachments/assets/eae41471-fc72-4574-8261-4f42c38b8c99
+
+**Text to Design, Design to Code**
+
 https://github.com/user-attachments/assets/17bda971-0e83-4f18-8758-8ac2b8dcba62
 
 ---
