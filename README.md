@@ -1,11 +1,11 @@
 # figma-mcp-go
 
-Figma MCP — Free, No Rate Limits [![gquinche/figma-mcp-go server](https://glama.ai/mcp/servers/gquinche/figma-mcp-go/badges/score.svg)](https://glama.ai/mcp/servers/gquinche/figma-mcp-go)
+Figma MCP — Free, No Rate Limits [![vkhanhqui/figma-mcp-go server](https://glama.ai/mcp/servers/vkhanhqui/figma-mcp-go/badges/score.svg)](https://glama.ai/mcp/servers/vkhanhqui/figma-mcp-go)
 <p>
-  <a href="https://www.npmjs.com/package/@gquinche/figma-mcp-go"><img src="https://img.shields.io/npm/v/@gquinche/figma-mcp-go?color=blue" alt="npm version" /></a>
+  <a href="https://www.npmjs.com/package/@vkhanhqui/figma-mcp-go"><img src="https://img.shields.io/npm/v/@vkhanhqui/figma-mcp-go?color=blue" alt="npm version" /></a>
   <a href="https://registry.modelcontextprotocol.io/?q=figma-mcp-go"><img src="https://img.shields.io/badge/MCP-Registry-purple" alt="MCP Registry" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT" /></a>
-  <a href="https://github.com/gquinche/figma-mcp-go/stargazers"><img src="https://img.shields.io/github/stars/gquinche/figma-mcp-go?style=social" alt="GitHub stars" /></a>
+  <a href="https://github.com/vkhanhqui/figma-mcp-go/stargazers"><img src="https://img.shields.io/github/stars/vkhanhqui/figma-mcp-go?style=social" alt="GitHub stars" /></a>
 </p>
 
 Open-source Figma MCP server with full read/write access via plugin — no REST API, no rate limits. Turn text into designs and designs into real code. Works with Cursor, Claude, GitHub Copilot, and any MCP-compatible AI tool.
@@ -56,12 +56,12 @@ Install via `npx` — no build step required. Watch the setup video or follow th
 
 **Claude Code CLI**
 ```bash
-claude mcp add -s project figma-mcp-go -- npx -y @gquinche/figma-mcp-go@latest
+claude mcp add -s project figma-mcp-go -- npx -y @vkhanhqui/figma-mcp-go@latest
 ```
 
 **Codex CLI**
 ```bash
-codex mcp add figma-mcp-go -- npx -y @gquinche/figma-mcp-go@latest
+codex mcp add figma-mcp-go -- npx -y @vkhanhqui/figma-mcp-go@latest
 ```
 
 **.mcp.json** (Claude and other MCP-compatible tools)
@@ -70,7 +70,7 @@ codex mcp add figma-mcp-go -- npx -y @gquinche/figma-mcp-go@latest
   "mcpServers": {
     "figma-mcp-go": {
       "command": "npx",
-      "args": ["-y", "@gquinche/figma-mcp-go"]
+      "args": ["-y", "@vkhanhqui/figma-mcp-go"]
     }
   }
 }
@@ -85,7 +85,7 @@ codex mcp add figma-mcp-go -- npx -y @gquinche/figma-mcp-go@latest
       "command": "npx",
       "args": [
         "-y",
-        "@gquinche/figma-mcp-go"
+        "@vkhanhqui/figma-mcp-go"
       ]
     }
   }
@@ -95,7 +95,7 @@ codex mcp add figma-mcp-go -- npx -y @gquinche/figma-mcp-go@latest
 ### 2. Install the Figma plugin
 
 1. In Figma Desktop: **Plugins → Development → Import plugin from manifest**
-2. Select `manifest.json` from the [plugin.zip](https://github.com/gquinche/figma-mcp-go/releases)
+2. Select `manifest.json` from the [plugin.zip](https://github.com/vkhanhqui/figma-mcp-go/releases)
 3. Run the plugin inside any Figma file
 
 ---
@@ -257,10 +257,10 @@ Issues and PRs are welcome.
 
 ## Star History
 
-<a href="https://www.star-history.com/?repos=gquinche%2Ffigma-mcp-go&type=date&legend=top-left">
+<a href="https://www.star-history.com/?repos=vkhanhqui%2Ffigma-mcp-go&type=date&legend=top-left">
  <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=gquinche/figma-mcp-go&type=date&theme=dark&legend=top-left" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=gquinche/figma-mcp-go&type=date&legend=top-left" />
-   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=gquinche/figma-mcp-go&type=date&legend=top-left" />
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=vkhanhqui/figma-mcp-go&type=date&theme=dark&legend=top-left" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=vkhanhqui/figma-mcp-go&type=date&legend=top-left" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=vkhanhqui/figma-mcp-go&type=date&legend=top-left" />
  </picture>
 </a>

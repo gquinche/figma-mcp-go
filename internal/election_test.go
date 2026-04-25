@@ -39,14 +39,14 @@ func TestItoa(t *testing.T) {
 
 func TestElectionTick_LeaderDoesNothing(t *testing.T) {
 	port := freePort(t)
-	n := NewNode("127.0.0.1", port, "test")
+	n := NewNode("127.0.0.1", port, "test", "token")
 
 	if err := n.BecomeLeader(); err != nil {
 		t.Fatalf("BecomeLeader: %v", err)
 	}
 	t.Cleanup(n.Stop)
 
-	e := NewElection("127.0.0.1", port, n)
+	e := NewElection("127.0.0.1", port, n, "token")
 	if err := e.tick(context.Background()); err != nil {
 		t.Errorf("tick for LEADER: %v", err)
 	}
@@ -60,7 +60,11 @@ func TestElectionTick_LeaderDoesNothing(t *testing.T) {
 
 func TestElectionTick_FollowerHealthyLeader(t *testing.T) {
 	// Fake leader server that responds to /ping.
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "Bearer token" {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
 		w.WriteHeader(http.StatusOK)
 	}))
 	t.Cleanup(srv.Close)
@@ -72,10 +76,10 @@ func TestElectionTick_FollowerHealthyLeader(t *testing.T) {
 	}
 	testPort := tcpAddr.Port
 
-	n := NewNode("127.0.0.1", testPort, "test")
+	n := NewNode("127.0.0.1", testPort, "test", "token")
 	n.BecomeFollower()
 
-	e := NewElection("127.0.0.1", testPort, n)
+	e := NewElection("127.0.0.1", testPort, n, "token")
 	if err := e.tick(context.Background()); err != nil {
 		t.Errorf("tick: %v", err)
 	}
@@ -90,11 +94,11 @@ func TestElectionTick_FollowerHealthyLeader(t *testing.T) {
 func TestElectionTick_FollowerDeadLeader_TakesOver(t *testing.T) {
 	port := freePort(t)
 
-	n := NewNode("127.0.0.1", port, "test")
+	n := NewNode("127.0.0.1", port, "test", "token")
 	n.BecomeFollower()
 	t.Cleanup(n.Stop)
 
-	e := NewElection("127.0.0.1", port, n)
+	e := NewElection("127.0.0.1", port, n, "token")
 	if err := e.tick(context.Background()); err != nil {
 		t.Errorf("tick: %v", err)
 	}
@@ -109,11 +113,11 @@ func TestElectionTick_FollowerDeadLeader_TakesOver(t *testing.T) {
 
 func TestElectionTick_UnknownBecomesLeader(t *testing.T) {
 	port := freePort(t)
-	n := NewNode("127.0.0.1", port, "test")
+	n := NewNode("127.0.0.1", port, "test", "token")
 	// Role stays UNKNOWN — no BecomeLeader/BecomeFollower called.
 	t.Cleanup(n.Stop)
 
-	e := NewElection("127.0.0.1", port, n)
+	e := NewElection("127.0.0.1", port, n, "token")
 	if err := e.tick(context.Background()); err != nil {
 		t.Errorf("tick: %v", err)
 	}
@@ -127,10 +131,10 @@ func TestElectionTick_UnknownBecomesLeader(t *testing.T) {
 
 func TestElectionStart_Stop(t *testing.T) {
 	port := freePort(t)
-	n := NewNode("127.0.0.1", port, "test")
+	n := NewNode("127.0.0.1", port, "test", "token")
 	t.Cleanup(n.Stop)
 
-	e := NewElection("127.0.0.1", port, n)
+	e := NewElection("127.0.0.1", port, n, "token")
 	ctx := context.Background()
 
 	if err := e.Start(ctx); err != nil {
@@ -154,13 +158,13 @@ func TestElectionStart_Stop(t *testing.T) {
 func TestElection_ConcurrentStart_OneLeader(t *testing.T) {
 	port := freePort(t)
 
-	n1 := NewNode("127.0.0.1", port, "test")
-	n2 := NewNode("127.0.0.1", port, "test")
+	n1 := NewNode("127.0.0.1", port, "test", "token")
+	n2 := NewNode("127.0.0.1", port, "test", "token")
 	t.Cleanup(n1.Stop)
 	t.Cleanup(n2.Stop)
 
-	e1 := NewElection("127.0.0.1", port, n1)
-	e2 := NewElection("127.0.0.1", port, n2)
+	e1 := NewElection("127.0.0.1", port, n1, "token")
+	e2 := NewElection("127.0.0.1", port, n2, "token")
 	t.Cleanup(e1.Stop)
 	t.Cleanup(e2.Stop)
 
@@ -198,7 +202,7 @@ func TestElection_ConcurrentTakeover_OneLeader(t *testing.T) {
 	port := freePort(t)
 
 	// Elect a real leader so followers can ping it.
-	leader := NewNode("127.0.0.1", port, "test")
+	leader := NewNode("127.0.0.1", port, "test", "token")
 	if err := leader.BecomeLeader(); err != nil {
 		t.Fatalf("BecomeLeader: %v", err)
 	}
@@ -207,9 +211,9 @@ func TestElection_ConcurrentTakeover_OneLeader(t *testing.T) {
 	nodes := make([]*Node, n)
 	elections := make([]*Election, n)
 	for i := range nodes {
-		nodes[i] = NewNode("127.0.0.1", port, "test")
+		nodes[i] = NewNode("127.0.0.1", port, "test", "token")
 		nodes[i].BecomeFollower()
-		elections[i] = NewElection("127.0.0.1", port, nodes[i])
+		elections[i] = NewElection("127.0.0.1", port, nodes[i], "token")
 		t.Cleanup(nodes[i].Stop)
 	}
 
