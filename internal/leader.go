@@ -142,6 +142,11 @@ func (l *Leader) handleRPC(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if r.Header.Get("Content-Type") != "application/json" {
+		http.Error(w, "unsupported media type", http.StatusUnsupportedMediaType)
+		return
+	}
+
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		l.sendJSON(w, http.StatusBadRequest, RPCResponse{Error: "failed to read body"})

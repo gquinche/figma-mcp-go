@@ -13,7 +13,7 @@ import (
 
 	"github.com/mark3labs/mcp-go/server"
 
-	"github.com/vkhanhqui/figma-mcp-go/internal"
+	"github.com/gquinche/figma-mcp-go/internal"
 )
 
 // version is injected at build time:
