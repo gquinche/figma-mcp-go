@@ -17,13 +17,15 @@ var followerLogger = log.New(os.Stderr, "[follower] ", 0)
 // Follower proxies MCP tool calls to the leader via HTTP /rpc.
 type Follower struct {
 	leaderURL string
+	token     string
 	client    *http.Client
 }
 
 // NewFollower creates a Follower pointed at the given leader base URL.
-func NewFollower(leaderURL string) *Follower {
+func NewFollower(leaderURL string, token string) *Follower {
 	return &Follower{
 		leaderURL: leaderURL,
+		token:     token,
 		client: &http.Client{
 			// 35s > 30s bridge timeout — gives the leader time to time out first
 			Timeout: 35 * time.Second,
@@ -52,6 +54,9 @@ func (f *Follower) Send(ctx context.Context, tool string, nodeIDs []string, para
 		return BridgeResponse{}, fmt.Errorf("new request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
+	if f.token != "" {
+		req.Header.Set("Authorization", "Bearer "+f.token)
+	}
 
 	resp, err := f.client.Do(req)
 	if err != nil {
@@ -91,6 +96,9 @@ func (f *Follower) Ping(ctx context.Context) bool {
 	if err != nil {
 		followerLogger.Printf("ping new request error: %v", err)
 		return false
+	}
+	if f.token != "" {
+		req.Header.Set("Authorization", "Bearer "+f.token)
 	}
 
 	resp, err := f.client.Do(req)

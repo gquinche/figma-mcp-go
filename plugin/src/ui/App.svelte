@@ -13,10 +13,12 @@
   // is unavailable inside Figma's data: URL sandbox.
   let serverHost = "127.0.0.1";
   let serverPort = "1994";
+  let serverToken = "";
 
   let showSettings = false;
   let editHost = serverHost;
   let editPort = serverPort;
+  let editToken = serverToken;
 
   const RECONNECT_DELAY_MS = 1500;
 
@@ -32,7 +34,11 @@
       socket.onclose = null;
       socket.close();
     }
-    const ws = new WebSocket(`ws://${serverHost}:${serverPort}/ws`);
+    const url = new URL(`ws://${serverHost}:${serverPort}/ws`);
+    if (serverToken) {
+      url.searchParams.set("token", serverToken);
+    }
+    const ws = new WebSocket(url.toString());
     socket = ws;
 
     ws.onopen = () => {
@@ -79,6 +85,7 @@
     if (msg.type === "ws_config") {
       serverHost = msg.host ?? "127.0.0.1";
       serverPort = msg.port ?? "1994";
+      serverToken = msg.token ?? "";
       if (!configLoaded) {
         configLoaded = true;
         connect();
@@ -107,6 +114,7 @@
   function openSettings() {
     editHost = serverHost;
     editPort = serverPort;
+    editToken = serverToken;
     showSettings = true;
   }
 
@@ -114,10 +122,18 @@
     serverHost = editHost.trim() || "127.0.0.1";
     const p = parseInt(editPort, 10);
     serverPort = p > 0 && p <= 65535 ? String(p) : "1994";
+    serverToken = editToken.trim();
     // Persist via plugin core (figma.clientStorage), since localStorage is
     // unavailable in Figma's data: URL environment.
     parent.postMessage(
-      { pluginMessage: { type: "save_ws_config", host: serverHost, port: serverPort } },
+      {
+        pluginMessage: {
+          type: "save_ws_config",
+          host: serverHost,
+          port: serverPort,
+          token: serverToken,
+        },
+      },
       "*"
     );
     showSettings = false;
@@ -196,6 +212,12 @@
             class="port-input"
             bind:value={editPort}
             placeholder="1994"
+            on:keydown={handleKeydown}
+          />
+          <input
+            class="token-input"
+            bind:value={editToken}
+            placeholder="token"
             on:keydown={handleKeydown}
           />
           <button class="apply-btn" on:click={applySettings} title="Apply">✓</button>
@@ -435,6 +457,22 @@
   }
 
   .port-input:focus {
+    border-color: #555;
+  }
+
+  .token-input {
+    width: 60px;
+    background: #2a2a2a;
+    border: 1px solid #444;
+    border-radius: 4px;
+    color: #e0e0e0;
+    font-size: 10px;
+    font-family: monospace;
+    padding: 2px 4px;
+    outline: none;
+  }
+
+  .token-input:focus {
     border-color: #555;
   }
 

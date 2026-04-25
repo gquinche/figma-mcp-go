@@ -52,6 +52,7 @@ figma.ui.onmessage = async (message) => {
       type: "ws_config",
       host: config?.host ?? "127.0.0.1",
       port: config?.port ?? "1994",
+      token: config?.token ?? "",
     });
     return;
   }
@@ -59,6 +60,7 @@ figma.ui.onmessage = async (message) => {
     await figma.clientStorage.setAsync("ws_config", {
       host: message.host,
       port: message.port,
+      token: message.token,
     });
     return;
   }
