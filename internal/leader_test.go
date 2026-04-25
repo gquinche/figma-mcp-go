@@ -69,6 +69,7 @@ func TestLeaderHandleRPC_InvalidJSON(t *testing.T) {
 	l := NewLeader("127.0.0.1", 0, "", "test-token")
 
 	req := httptest.NewRequest(http.MethodPost, "/rpc", bytes.NewBufferString("{bad json}"))
+	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer test-token")
 	w := httptest.NewRecorder()
 	l.handleRPC(w, req)
@@ -93,6 +94,7 @@ func TestLeaderHandleRPC_ValidationError(t *testing.T) {
 		Params:  map[string]any{},
 	})
 	req := httptest.NewRequest(http.MethodPost, "/rpc", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer test-token")
 	w := httptest.NewRecorder()
 	l.handleRPC(w, req)
@@ -113,6 +115,7 @@ func TestLeaderHandleRPC_BridgeNotConnected(t *testing.T) {
 	// get_document has no required params — passes validation, hits bridge
 	body, _ := json.Marshal(RPCRequest{Tool: "get_document"})
 	req := httptest.NewRequest(http.MethodPost, "/rpc", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer test-token")
 	w := httptest.NewRecorder()
 	l.handleRPC(w, req)
