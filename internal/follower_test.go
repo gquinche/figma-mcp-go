@@ -12,6 +12,10 @@ import (
 
 func TestFollowerPing_Success(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "Bearer test-token" {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
 		if r.URL.Path != "/ping" || r.Method != http.MethodGet {
 			http.NotFound(w, r)
 			return
@@ -20,7 +24,7 @@ func TestFollowerPing_Success(t *testing.T) {
 	}))
 	t.Cleanup(srv.Close)
 
-	f := NewFollower(srv.URL)
+	f := NewFollower(srv.URL, "test-token")
 	if !f.Ping(context.Background()) {
 		t.Error("expected Ping to return true for a responding server")
 	}
@@ -28,7 +32,7 @@ func TestFollowerPing_Success(t *testing.T) {
 
 func TestFollowerPing_ServerDown(t *testing.T) {
 	// Use a port that nothing is listening on.
-	f := NewFollower("http://127.0.0.1:1")
+	f := NewFollower("http://127.0.0.1:1", "")
 	if f.Ping(context.Background()) {
 		t.Error("expected Ping to return false when server is unreachable")
 	}
@@ -40,7 +44,7 @@ func TestFollowerPing_NonOKStatus(t *testing.T) {
 	}))
 	t.Cleanup(srv.Close)
 
-	f := NewFollower(srv.URL)
+	f := NewFollower(srv.URL, "")
 	if f.Ping(context.Background()) {
 		t.Error("expected Ping to return false for non-200 response")
 	}
@@ -52,6 +56,10 @@ func TestFollowerSend_Success(t *testing.T) {
 	wantData := map[string]any{"id": "1:1", "name": "Frame"}
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "Bearer test-token" {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
 		if r.URL.Path != "/rpc" || r.Method != http.MethodPost {
 			http.NotFound(w, r)
 			return
@@ -69,7 +77,7 @@ func TestFollowerSend_Success(t *testing.T) {
 	}))
 	t.Cleanup(srv.Close)
 
-	f := NewFollower(srv.URL)
+	f := NewFollower(srv.URL, "test-token")
 	resp, err := f.Send(context.Background(), "get_node", []string{"1:1"}, nil)
 	if err != nil {
 		t.Fatalf("Send: %v", err)
@@ -89,7 +97,7 @@ func TestFollowerSend_LeaderReturnsError(t *testing.T) {
 	}))
 	t.Cleanup(srv.Close)
 
-	f := NewFollower(srv.URL)
+	f := NewFollower(srv.URL, "")
 	resp, err := f.Send(context.Background(), "get_node", []string{"1:1"}, nil)
 	if err != nil {
 		t.Fatalf("unexpected transport error: %v", err)
@@ -105,7 +113,7 @@ func TestFollowerSend_InvalidJSON(t *testing.T) {
 	}))
 	t.Cleanup(srv.Close)
 
-	f := NewFollower(srv.URL)
+	f := NewFollower(srv.URL, "")
 	_, err := f.Send(context.Background(), "get_node", []string{"1:1"}, nil)
 	if err == nil {
 		t.Error("expected error for malformed JSON response")
@@ -113,7 +121,7 @@ func TestFollowerSend_InvalidJSON(t *testing.T) {
 }
 
 func TestFollowerSend_ServerDown(t *testing.T) {
-	f := NewFollower("http://127.0.0.1:1")
+	f := NewFollower("http://127.0.0.1:1", "")
 	_, err := f.Send(context.Background(), "get_node", []string{"1:1"}, nil)
 	if err == nil {
 		t.Error("expected error when server is unreachable")
@@ -130,7 +138,7 @@ func TestFollowerSend_ForwardsParams(t *testing.T) {
 	}))
 	t.Cleanup(srv.Close)
 
-	f := NewFollower(srv.URL)
+	f := NewFollower(srv.URL, "")
 	params := map[string]any{"text": "hello", "fontSize": float64(16)}
 	f.Send(context.Background(), "set_text", []string{"2:3"}, params) //nolint:errcheck
 

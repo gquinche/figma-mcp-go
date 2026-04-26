@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"flag"
 	"log"
 	"net"
@@ -11,7 +13,7 @@ import (
 
 	"github.com/mark3labs/mcp-go/server"
 
-	"github.com/gquinche/figma-mcp-go/internal"
+	"github.com/vkhanhqui/figma-mcp-go/internal"
 )
 
 // version is injected at build time:
@@ -23,21 +25,32 @@ var logger = log.New(os.Stderr, "", 0)
 func main() {
 	ip := flag.String("ip", "127.0.0.1", "IP address to listen on (use 0.0.0.0 to accept remote connections)")
 	port := flag.Int("port", 1994, "port to listen on")
+	tokenFlag := flag.String("token", "", "authentication token for follower-leader communication (generated if empty)")
 	flag.Parse()
+
+	token := *tokenFlag
+	if token == "" {
+		b := make([]byte, 16)
+		if _, err := rand.Read(b); err != nil {
+			logger.Fatalf("failed to generate random token: %v", err)
+		}
+		token = hex.EncodeToString(b)
+	}
 
 	parsedIP := net.ParseIP(*ip)
 	if parsedIP == nil {
 		logger.Fatalf("invalid IP address: %q", *ip)
 	}
 	if !parsedIP.IsLoopback() {
-		logger.Printf("WARNING: binding to %s — server will be reachable from the network with no authentication", *ip)
+		logger.Printf("WARNING: binding to %s — server will be reachable from the network", *ip)
 	}
+	logger.Printf("Security: using token %s", token)
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	node := internal.NewNode(*ip, *port, version)
-	election := internal.NewElection(*ip, *port, node)
+	node := internal.NewNode(*ip, *port, version, token)
+	election := internal.NewElection(*ip, *port, node, token)
 
 	if err := election.Start(ctx); err != nil {
 		logger.Fatalf("election start: %v", err)

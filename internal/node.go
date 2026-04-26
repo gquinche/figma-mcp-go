@@ -20,16 +20,18 @@ type Node struct {
 	leader   *Leader
 	follower *Follower
 	version  string
+	token    string
 }
 
 // NewNode creates a Node in the Unknown role.
-func NewNode(ip string, port int, version string) *Node {
+func NewNode(ip string, port int, version string, token string) *Node {
 	return &Node{
 		ip:       ip,
 		port:     port,
 		role:     RoleUnknown,
 		version:  version,
-		follower: NewFollower(fmt.Sprintf("http://%s:%d", ip, port)),
+		token:    token,
+		follower: NewFollower(fmt.Sprintf("http://%s:%d", ip, port), token),
 	}
 }
 
@@ -88,7 +90,7 @@ func (n *Node) BecomeLeader() error {
 		return nil
 	}
 
-	leader := NewLeader(n.ip, n.port, n.version)
+	leader := NewLeader(n.ip, n.port, n.version, n.token)
 	if err := leader.Start(); err != nil {
 		return err
 	}

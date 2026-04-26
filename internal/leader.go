@@ -28,15 +28,17 @@ type Leader struct {
 	bridge  *Bridge
 	server  *http.Server
 	version string
+	token   string
 }
 
 // NewLeader creates a Leader. Call Start() to bind the ip:port.
-func NewLeader(ip string, port int, version string) *Leader {
+func NewLeader(ip string, port int, version string, token string) *Leader {
 	return &Leader{
 		ip:      ip,
 		port:    port,
 		bridge:  NewBridge(),
 		version: version,
+		token:   token,
 	}
 }
 
@@ -80,8 +82,34 @@ func (l *Leader) Stop() {
 	l.bridge.Close()
 }
 
+// authenticate checks if the request is authorised.
+func (l *Leader) authenticate(w http.ResponseWriter, r *http.Request) bool {
+	if l.token == "" {
+		return true
+	}
+
+	// For WebSocket, check query parameter.
+	if r.URL.Path == "/ws" || r.Header.Get("Upgrade") == "websocket" {
+		if r.URL.Query().Get("token") == l.token {
+			return true
+		}
+	}
+
+	// For RPC and Ping, check Authorization header.
+	auth := r.Header.Get("Authorization")
+	if auth == "Bearer "+l.token {
+		return true
+	}
+
+	http.Error(w, "unauthorized", http.StatusUnauthorized)
+	return false
+}
+
 // handlePing responds to health checks from followers.
 func (l *Leader) handlePing(w http.ResponseWriter, r *http.Request) {
+	if !l.authenticate(w, r) {
+		return
+	}
 	if r.Method != http.MethodGet {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -98,18 +126,19 @@ func (l *Leader) handlePing(w http.ResponseWriter, r *http.Request) {
 
 // handleWS upgrades the connection to WebSocket for the Figma plugin.
 func (l *Leader) handleWS(w http.ResponseWriter, r *http.Request) {
+	if !l.authenticate(w, r) {
+		return
+	}
 	l.bridge.HandleUpgrade(w, r)
 }
 
 // handleRPC handles JSON RPC calls from follower processes.
 func (l *Leader) handleRPC(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	if !l.authenticate(w, r) {
 		return
 	}
-
-	if r.Header.Get("Content-Type") != "application/json" {
-		http.Error(w, "unsupported media type", http.StatusUnsupportedMediaType)
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
